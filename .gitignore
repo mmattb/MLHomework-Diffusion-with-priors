@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project outputs
+outputs/
+checkpoints/
+samples/
+logs/
+*.pt
+*.pth
+*.ckpt
+
+# Internal notes (not for public repo)
+TODOs
+.github-prep-notes.txt
+cleanup_for_release.sh
+RELEASE_CHECKLIST.md
+
+# Wandb
+wandb/
+
+# Images (except dataset samples for README)
+*.png
+*.jpg
+*.jpeg
+!dataset_samples.png
