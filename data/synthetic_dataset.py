@@ -85,6 +85,8 @@ class SyntheticHierarchicalDataset(Dataset):
                 "jitter_x": np.random.uniform(-5, 5),
                 "jitter_y": np.random.uniform(-5, 5),
                 "scale": np.random.uniform(0.8, 1.2),
+                "nose_offset_y": np.random.uniform(-3, 3) if z1 == "dog" else 0,  # Dogs have varying nose position
+                "nose_size": np.random.uniform(2, 5) if z1 == "dog" else 3,  # Dogs have varying nose size
             }
 
             self.samples.append(
@@ -125,12 +127,41 @@ class SyntheticHierarchicalDataset(Dataset):
 
         # Create shape based on z1
         if z1 == "dog":
+            # Big floppy ears (like springer spaniels) - draw first so face overlaps
+            ear_width = 8
+            ear_height = 25
+            # Left ear
+            left_ear_pts = np.array(
+                [
+                    [center_x - base_size, center_y - 5],
+                    [center_x - base_size - ear_width, center_y],
+                    [center_x - base_size - ear_width, center_y + ear_height],
+                    [center_x - base_size, center_y + ear_height],
+                ],
+                np.int32,
+            )
+            cv2.fillPoly(img, [left_ear_pts], (0, 0, 0))
+            # Right ear
+            right_ear_pts = np.array(
+                [
+                    [center_x + base_size, center_y - 5],
+                    [center_x + base_size + ear_width, center_y],
+                    [center_x + base_size + ear_width, center_y + ear_height],
+                    [center_x + base_size, center_y + ear_height],
+                ],
+                np.int32,
+            )
+            cv2.fillPoly(img, [right_ear_pts], (0, 0, 0))
             # Circle (dog face)
             radius = base_size
             cv2.circle(img, (center_x, center_y), radius, (0, 0, 0), -1)
             # Eyes
             cv2.circle(img, (center_x - 8, center_y - 5), 3, (255, 255, 255), -1)
             cv2.circle(img, (center_x + 8, center_y - 5), 3, (255, 255, 255), -1)
+            # White nose (varies in position and size)
+            nose_y = int(center_y + 5 + z0["nose_offset_y"])
+            nose_radius = int(z0["nose_size"])
+            cv2.circle(img, (center_x, nose_y), nose_radius, (255, 255, 255), -1)
 
         elif z1 == "cat":
             # Circle with triangular ears
@@ -158,6 +189,8 @@ class SyntheticHierarchicalDataset(Dataset):
             # Eyes
             cv2.circle(img, (center_x - 8, center_y - 5), 3, (255, 255, 255), -1)
             cv2.circle(img, (center_x + 8, center_y - 5), 3, (255, 255, 255), -1)
+            # White nose (fixed position and size)
+            cv2.circle(img, (center_x, center_y + 5), 3, (255, 255, 255), -1)
 
         elif z1 == "car":
             # Horizontal rectangle
