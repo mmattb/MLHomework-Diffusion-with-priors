@@ -8,6 +8,8 @@ import torch
 import torch.nn as nn
 import math
 
+from typing import Optional
+
 
 class SinusoidalTimeEmbedding(nn.Module):
     """
@@ -106,8 +108,6 @@ class TimeEmbeddingMLP(nn.Module):
         """
         return self.mlp(time_emb)
 
-
-from typing import Optional
 
 if __name__ == "__main__":
     # Test time embeddings
