@@ -12,6 +12,10 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 import os
 from typing import Dict, Optional
+
+# Set matplotlib to non-interactive backend before importing pyplot
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -277,7 +281,7 @@ def visualize_samples(
     Visualize generated samples in a grid.
 
     Args:
-        samples: Tensor of shape (N, 3, 64, 64) with values in [-1, 1]
+        samples: Tensor of shape (N, C, 64, 64) with values in [-1, 1] (C=1 for grayscale, C=3 for RGB)
         save_path: Path to save the image
         nrow: Number of images per row
         title: Optional title for the plot
@@ -297,8 +301,15 @@ def visualize_samples(
     axes = axes.flatten()
 
     for i in range(n_samples):
-        img = samples[i].permute(1, 2, 0).numpy()
-        axes[i].imshow(img)
+        # Handle both grayscale (C=1) and RGB (C=3)
+        if samples.shape[1] == 1:
+            # Grayscale - squeeze channel dimension
+            img = samples[i, 0].numpy()
+            axes[i].imshow(img, cmap='gray')
+        else:
+            # RGB
+            img = samples[i].permute(1, 2, 0).numpy()
+            axes[i].imshow(img)
         axes[i].axis("off")
 
     # Hide extra subplots
@@ -311,7 +322,7 @@ def visualize_samples(
     plt.tight_layout()
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
     plt.savefig(save_path, dpi=150, bbox_inches="tight")
-    plt.close()
+    plt.close(fig)
     print(f"Saved samples to {save_path}")
 
 

@@ -1,6 +1,6 @@
 # Installation & Usage Guide
 
-Complete guide for setting up, implementing, and running the hierarchical diffusion experiments.
+Complete guide for setting up and running the hierarchical diffusion experiments.
 
 ## 📦 Installation
 
@@ -32,110 +32,39 @@ python -m data.synthetic_dataset
 
 You should see a `dataset_samples.png` file created with 100 sample images.
 
-## 🎓 Implementation Guide
+## 🎓 Getting Started
 
-### Your Tasks (5 Functions)
+### Step 1: Read the Assignment
 
-You'll implement 5 key functions marked with `★★★ TODO ★★★` in the code.
+See **[ASSIGNMENT.md](ASSIGNMENT.md)** for detailed implementation instructions. You'll implement 5 key functions:
 
-#### 1. ImageDenoiser Forward Pass (2-3 hours)
+1. `ImageDenoiser.forward()` - Image diffusion network (Parts 1)
+2. `LatentPrior.forward()` - Latent diffusion prior (Part 2)
+3. Training both models (Parts 3-4)
+4. Visualizing results (Part 5)
+5. Three evaluation metrics (Parts 6-8)
 
-**File:** `models/image_denoiser.py`  
-**Function:** `forward(x_t, t, condition)`
+### Step 2: Implementation Workflow
 
-**What to do:**
-1. Get time embeddings using `self.time_mlp(t)`
-2. Get condition embeddings using `self.condition_embedding(condition)`  
-3. Concatenate embeddings: `[time_emb, cond_emb]`
-4. Pass through UNet with `self.unet(x_t, combined_embedding)`
-5. Return predicted noise
-
-**Test:**
 ```bash
-python -m models.image_denoiser
+# 1. Implement the networks
+python -m models.image_denoiser  # Test Part 1
+python -m models.latent_prior     # Test Part 2
+
+# 2. Train models (no metrics needed yet!)
+python train.py --model flat --epochs 50
+python train.py --model hierarchical --epochs 50
+
+# 3. Visualize what you learned
+python sample.py --model flat --checkpoint outputs/flat/final.pt --z2 animal
+python sample.py --model hierarchical --checkpoint outputs/hierarchical/final.pt --z2 animal
+python visualize_embeddings.py --checkpoint outputs/hierarchical/final.pt --z2 animal
+
+# 4. Implement evaluation metrics (Parts 6-8)
+# Then run full evaluation
+python evaluate.py --model flat --checkpoint outputs/flat/final.pt
+python evaluate.py --model hierarchical --checkpoint outputs/hierarchical/final.pt
 ```
-
-#### 2. LatentPrior Forward Pass (1-2 hours)
-
-**File:** `models/latent_prior.py`  
-**Function:** `forward(z1_t, t, z2_condition)`
-
-**What to do:**
-1. Get time embeddings using `self.time_mlp(t)`
-2. Get condition embeddings using `self.z2_encoder(z2_condition)`
-3. Concatenate: `[z1_t, time_emb, cond_emb]` 
-4. Pass through MLP: `self.mlp(combined)`
-5. Return predicted noise
-
-**Test:**
-```bash
-python -m models.latent_prior
-```
-
-#### 3. Mode Coverage Metric (2-3 hours)
-
-**File:** `evaluation/metrics.py`  
-**Function:** `compute_mode_coverage(samples, z1_classifier, dataset)`
-
-**What to do:**
-1. Classify generated samples to predict z1 subtype
-2. Count unique subtypes per z2 category
-3. Normalize by total possible subtypes (2 per category)
-4. Return average coverage across categories
-
-**Why:** Measures what fraction of semantic modes are represented
-
-#### 4. Conditional Entropy (2-3 hours)
-
-**File:** `evaluation/metrics.py`  
-**Function:** `compute_conditional_entropy(samples, z1_encoder, z2_labels)`
-
-**What to do:**
-1. Encode samples to latent embeddings
-2. Cluster embeddings (e.g., k-means) per z2 condition
-3. Estimate p(cluster | z2) from counts
-4. Compute H(z1 | z2) = -∑ p(cluster|z2) log p(cluster|z2)
-5. Return average entropy
-
-**Why:** Higher entropy = more diversity in generated outputs
-
-#### 5. KL Divergence (2-3 hours)
-
-**File:** `evaluation/metrics.py`  
-**Function:** `compute_kl_divergence(samples, z1_classifier, dataset)`
-
-**What to do:**
-1. Classify samples to get estimated p_model(z1 | z2)
-2. Get ground truth p_data(z1 | z2) from dataset
-3. Compute KL(p_data || p_model) for each z2
-4. Return average KL divergence
-
-**Why:** Measures distributional mismatch from ground truth
-
-### Full Implementation Checklist
-
-#### Setup ✓
-- [ ] Install dependencies
-- [ ] Test dataset generation
-- [ ] Read [ASSIGNMENT.md](ASSIGNMENT.md) for detailed instructions
-
-#### Implementation ⭐
-- [ ] Implement `ImageDenoiser.forward()` and test
-- [ ] Implement `LatentPrior.forward()` and test
-- [ ] Implement `compute_mode_coverage()`
-- [ ] Implement `compute_conditional_entropy()`
-- [ ] Implement `compute_kl_divergence()`
-
-#### Training 🚀
-- [ ] Train flat model: `python train.py --model flat --epochs 50`
-- [ ] Train hierarchical model: `python train.py --model hierarchical --epochs 50`
-
-#### Evaluation 📊
-- [ ] Evaluate flat model
-- [ ] Evaluate hierarchical model
-- [ ] Compare mode coverage (hierarchical should be higher)
-- [ ] Compare entropy (hierarchical should be higher)
-- [ ] Compare KL divergence (hierarchical should be lower)
 
 ## 🚀 Usage
 

@@ -51,13 +51,26 @@ class SyntheticHierarchicalDataset(Dataset):
         }
 
         # Create fixed embeddings for each z1 subtype (2-dim, L2-normalized)
+        # IMPORTANT: Group embeddings by z2 category so the prior can learn the structure!
+        # Animals get top half of circle (0° to 180°), vehicles get bottom half (180° to 360°)
         np.random.seed(seed)
         self.z1_embeddings = {}
+        
+        # Assign distinct angular regions for each z2 category
+        z2_angle_ranges = {
+            "animal": (0, np.pi),      # 0° to 180° (top semicircle)
+            "vehicle": (np.pi, 2*np.pi)  # 180° to 360° (bottom semicircle)
+        }
+        
         for z2 in self.z2_categories:
-            for z1 in self.z1_subtypes[z2]:
-                # Random vector on unit sphere
-                vec = np.random.randn(2)
-                vec = vec / np.linalg.norm(vec)
+            angle_min, angle_max = z2_angle_ranges[z2]
+            z1_list = self.z1_subtypes[z2]
+            
+            # Evenly space subtypes within this category's angular range
+            for i, z1 in enumerate(z1_list):
+                # Place subtypes evenly within the range, with some spacing from boundaries
+                angle = angle_min + (angle_max - angle_min) * (i + 1) / (len(z1_list) + 1)
+                vec = np.array([np.cos(angle), np.sin(angle)])
                 self.z1_embeddings[z1] = vec
 
         # Pre-generate all samples for consistency

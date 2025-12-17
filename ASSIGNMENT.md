@@ -8,11 +8,13 @@ Track your progress as you complete each part:
 
 - [ ] Part 1: ImageDenoiser forward() ⏱️ 2-3 hours
 - [ ] Part 2: LatentPrior forward() ⏱️ 1-2 hours  
-- [ ] Part 3: Mode coverage metric ⏱️ 2-3 hours
-- [ ] Part 4: Conditional entropy ⏱️ 2-3 hours
-- [ ] Part 5: KL divergence ⏱️ 2-3 hours
-- [ ] Part 6: Train both models successfully ⏱️ 1 hour
-- [ ] Part 7: Run evaluation and see the difference! ⏱️ 30 mins
+- [ ] Part 3: Train Model A (baseline) ⏱️ 10-15 mins GPU / 1-2 hours CPU
+- [ ] Part 4: Train Model B (hierarchical) ⏱️ 20-30 mins GPU / 2-3 hours CPU
+- [ ] Part 5: Visualize embeddings and samples ⏱️ 15 mins
+- [ ] Part 6: Mode coverage metric ⏱️ 2-3 hours
+- [ ] Part 7: Conditional entropy ⏱️ 2-3 hours
+- [ ] Part 8: KL divergence ⏱️ 2-3 hours
+- [ ] Part 9: Full evaluation and comparison ⏱️ 30 mins
 
 ---
 
@@ -218,16 +220,147 @@ The framework provides complete training loops, data generation, and scaffolding
 
 ---
 
-## Part 3: Mode Coverage Metric (★★☆)
+## Part 3: Train Model A (Baseline) (★☆☆)
+
+**Goal**: Train the flat conditional diffusion model to observe mode collapse.
+
+**What to do**:
+
+1. **Verify your implementations** work by running the test scripts:
+   ```bash
+   python -m models.image_denoiser
+   python -m models.latent_prior
+   ```
+
+2. **Train Model A** (flat/baseline model):
+   ```bash
+   python train.py --model flat --epochs 50 --output_dir outputs/flat
+   ```
+   
+   This trains the ImageDenoiser conditioned directly on z2 (high-level category).
+
+3. **Monitor training**:
+   - Training loss should decrease steadily
+   - Should take ~10-15 minutes on GPU, ~1-2 hours on CPU
+   - Checkpoints saved to `outputs/flat/`
+
+4. **What to expect**:
+   - Model will train successfully
+   - BUT: When you generate samples later, you'll see mode collapse (only dogs OR only cats, not both)
+
+**Command options**:
+- `--model flat`: Use the baseline architecture
+- `--epochs 50`: Train for 50 epochs (adjust as needed)
+- `--batch_size 64`: Batch size (default)
+- `--lr 1e-4`: Learning rate
+- `--output_dir outputs/flat`: Where to save checkpoints
+
+**Learning goal**: Understand that even well-trained models can exhibit mode collapse.
+
+**Status**: ⬜ Not trained
+
+---
+
+## Part 4: Train Model B (Hierarchical) (★★☆)
+
+**Goal**: Train the hierarchical diffusion model to preserve semantic diversity.
+
+**What to do**:
+
+1. **Train Model B** (hierarchical model):
+   ```bash
+   python train.py --model hierarchical --epochs 50 --output_dir outputs/hierarchical
+   ```
+   
+   This trains:
+   - LatentPrior: p(z1 | z2) - diffusion over latent embeddings
+   - ImageDecoder: p(image | z1) - diffusion over images
+
+2. **Monitor training**:
+   - You'll see TWO losses: `prior_loss` and `decoder_loss`
+   - Both should decrease during training
+   - Takes ~20-30 minutes on GPU, ~2-3 hours on CPU
+   - Checkpoints saved to `outputs/hierarchical/`
+
+3. **What to expect**:
+   - Two-stage training process
+   - Model learns to factorize: first sample z1, then generate image
+   - Should preserve mode diversity (both dogs AND cats)
+
+**Command options**:
+- `--model hierarchical`: Use the hierarchical architecture
+- `--epochs 50`: Train for 50 epochs
+- `--latent_dim 2`: Size of z1 embeddings (use 2 for visualization!)
+- `--output_dir outputs/hierarchical`: Where to save checkpoints
+
+**Learning goal**: Understand how hierarchical structure prevents mode collapse.
+
+**Status**: ⬜ Not trained
+
+---
+
+## Part 5: Visualize Embeddings and Samples (★☆☆)
+
+**Goal**: Visualize what the models have learned before implementing formal metrics.
+
+**What to do**:
+
+1. **Generate samples from both models**:
+   ```bash
+   # Model A samples (should show mode collapse)
+   python sample.py --model flat --checkpoint outputs/flat/final.pt --z2 animal --num_samples 16
+   
+   # Model B samples (should show diversity)
+   python sample.py --model hierarchical --checkpoint outputs/hierarchical/final.pt --z2 animal --num_samples 16
+   ```
+   
+   Look at the generated images - do you see both dogs AND cats, or just one type?
+
+2. **Visualize z1 embeddings in 2D space** (Model B only):
+   ```bash
+   python visualize_embeddings.py --checkpoint outputs/hierarchical/final.pt --z2 animal --num_samples 500
+   python visualize_embeddings.py --checkpoint outputs/hierarchical/final.pt --z2 vehicle --num_samples 500
+   ```
+   
+   This creates two visualizations:
+   - **Scatter plot**: Shows where z1 samples land in 2D space
+   - **Histogram**: Shows how many samples assigned to each mode
+
+3. **What to look for**:
+   
+   **For Model A (flat)**:
+   - Generated images should mostly be ONE type (all dogs or all cats)
+   - This is mode collapse!
+   
+   **For Model B (hierarchical)**:
+   - z1 embeddings should cluster around **4 ground truth points** (dog, cat, car, truck)
+   - You should see **2 clusters** for "animal" (dog and cat)
+   - You should see **2 clusters** for "vehicle" (car and truck)
+   - Histogram should show relatively balanced counts
+   - Generated images should show BOTH types
+
+**Why 4 lumps?**:
+- z1 has dimension 2 and is L2-normalized (lies on unit circle)
+- There are 4 distinct z1 values: dog, cat, car, truck
+- Each gets a unique 2D embedding during dataset creation
+- Model B's prior should learn to sample near these 4 points
+
+**Learning goal**: Get intuition for what mode collapse looks like and how hierarchical models prevent it.
+
+**Status**: ⬜ Not visualized
+
+---
+
+## Part 6: Mode Coverage Metric (★★☆)
 
 **File**: `evaluation/metrics.py`
 
 **What to implement**: The `compute_mode_coverage()` function.
 
-**Goal**: Measure how many distinct z1 categories are recovered when sampling from p(image | z2).
+**Goal**: Now that you've seen mode collapse visually, implement a metric to quantify it.
 
 **Inputs**:
-- `samples`: Generated images, shape `(num_samples, 3, 64, 64)`
+- `samples`: Generated images, shape `(num_samples, 1, 64, 64)`
 - `z2_condition`: The conditioning used (e.g., "animal" or "vehicle")
 - `dataset`: The dataset object with ground truth information
 
@@ -245,13 +378,13 @@ The framework provides complete training loops, data generation, and scaffolding
 3. Compare to the total number of possible z1 modes for this z2
 4. Return the coverage statistics
 
-**Learning goal**: Understand how to quantify mode collapse in generative models.
+**Learning goal**: Quantify what you observed visually in Part 5.
 
 **Status**: ⬜ Not implemented
 
 ---
 
-## Part 4: Conditional Entropy (★★☆)
+## Part 7: Conditional Entropy (★★☆)
 
 **File**: `evaluation/metrics.py`
 
@@ -274,13 +407,13 @@ The framework provides complete training loops, data generation, and scaffolding
 3. Compute entropy: H = -∑ p(z1|z2) log p(z1|z2)
 4. Return the entropy value
 
-**Learning goal**: Understand how to measure diversity in latent representations.
+**Learning goal**: Measure diversity in latent representations numerically.
 
 **Status**: ⬜ Not implemented
 
 ---
 
-## Part 5: KL Divergence (★★★)
+## Part 8: KL Divergence (★★★)
 
 **File**: `evaluation/metrics.py`
 
@@ -305,36 +438,49 @@ The framework provides complete training loops, data generation, and scaffolding
 4. Handle numerical stability (log(0), division by zero)
 5. Return the KL divergence
 
-**Learning goal**: Understand how to compare model distributions to ground truth.
+**Learning goal**: Compare model distributions to ground truth quantitatively.
 
 **Status**: ⬜ Not implemented
 
 ---
 
-## Testing Your Implementation
+## Part 9: Full Evaluation and Comparison (★☆☆)
 
-Once you've implemented the above components, you can:
+**Goal**: Run complete evaluation with all metrics on both models.
 
-1. **Train Model A (baseline)**:
+**What to do**:
+
+1. **Evaluate Model A**:
    ```bash
-   python train.py --model flat --epochs 50
+   python evaluate.py --model flat --checkpoint outputs/flat/final.pt
+   ```
+   
+   This will:
+   - Generate samples conditioned on "animal" and "vehicle"
+   - Compute mode coverage, conditional entropy, KL divergence
+   - Save visualizations to `outputs/flat/evaluation/`
+
+2. **Evaluate Model B**:
+   ```bash
+   python evaluate.py --model hierarchical --checkpoint outputs/hierarchical/final.pt
    ```
 
-2. **Train Model B (hierarchical)**:
-   ```bash
-   python train.py --model hierarchical --epochs 50
-   ```
+3. **Compare results**:
+   - **Mode coverage**: Model A ≈ 0.5 (collapses), Model B ≈ 1.0 (diverse)
+   - **Conditional entropy**: Model A low, Model B high
+   - **KL divergence**: Model A high, Model B low
+   - Check generated images in output folders
 
-3. **Evaluate models**:
-   ```bash
-   python evaluate.py --model_path checkpoints/model_a.pt
-   python evaluate.py --model_path checkpoints/model_b.pt
-   ```
+4. **Analyze**:
+   - Do the metrics match what you observed visually?
+   - Why does Model A collapse even though training loss is low?
+   - How does the hierarchical structure prevent collapse?
 
-4. **Generate samples**:
-   ```bash
-   python sample.py --model_path checkpoints/model_b.pt --z2 animal --num_samples 16
-   ```
+**Learning goal**: Verify quantitatively that hierarchical structure prevents mode collapse.
+
+**Status**: ⬜ Not evaluated
+
+---
 
 ## Expected Results
 

@@ -64,14 +64,14 @@ def sample_model_a(args):
         if args.use_ddim:
             samples = diffusion.ddim_sample(
                 model,
-                shape=(args.num_samples, 3, 64, 64),
+                shape=(args.num_samples, 1, 64, 64),
                 condition=z2_onehot,
                 num_steps=args.ddim_steps,
                 eta=args.ddim_eta,
             )
         else:
             samples = diffusion.p_sample(
-                model, shape=(args.num_samples, 3, 64, 64), condition=z2_onehot
+                model, shape=(args.num_samples, 1, 64, 64), condition=z2_onehot
             )
 
     # Visualize
@@ -100,7 +100,7 @@ def sample_model_b(args):
         latent_dim=32, condition_dim=2, time_embed_dim=32, hidden_dims=(256, 256, 256)
     )
     decoder = ImageDenoiser(
-        image_channels=3,
+        image_channels=1,
         condition_dim=32,
         time_embed_dim=32,
         model_channels=args.model_channels,
@@ -161,14 +161,14 @@ def sample_model_b(args):
         if args.use_ddim:
             samples = decoder_diffusion.ddim_sample(
                 decoder,
-                shape=(args.num_samples, 3, 64, 64),
+                shape=(args.num_samples, 1, 64, 64),
                 condition=z1_samples,
                 num_steps=args.ddim_steps,
                 eta=args.ddim_eta,
             )
         else:
             samples = decoder_diffusion.p_sample(
-                decoder, shape=(args.num_samples, 3, 64, 64), condition=z1_samples
+                decoder, shape=(args.num_samples, 1, 64, 64), condition=z1_samples
             )
 
     # Visualize

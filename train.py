@@ -98,7 +98,7 @@ def train_model_a(args):
                 z2_onehot = torch.zeros(16, 2, device=device)
                 z2_onehot[:, 0] = 1.0  # animal
                 samples = diffusion.p_sample(
-                    model, shape=(16, 3, 64, 64), condition=z2_onehot
+                    model, shape=(16, 1, 64, 64), condition=z2_onehot
                 )
                 visualize_samples(
                     samples,
@@ -113,7 +113,7 @@ def train_model_a(args):
                 z2_onehot = torch.zeros(16, 2, device=device)
                 z2_onehot[:, 1] = 1.0  # vehicle
                 samples = diffusion.p_sample(
-                    model, shape=(16, 3, 64, 64), condition=z2_onehot
+                    model, shape=(16, 1, 64, 64), condition=z2_onehot
                 )
                 visualize_samples(
                     samples,
@@ -161,14 +161,14 @@ def train_model_b(args):
     # Create models
     print("Creating models...")
     prior = LatentPrior(
-        latent_dim=32,
+        latent_dim=args.latent_dim,
         condition_dim=2,  # z2 one-hot
         time_embed_dim=32,
         hidden_dims=(256, 256, 256),
     )
     decoder = ImageDenoiser(
         image_channels=1,
-        condition_dim=32,  # z1 embedding
+        condition_dim=args.latent_dim,  # z1 embedding
         time_embed_dim=32,
         model_channels=args.model_channels,
     )
@@ -241,12 +241,12 @@ def train_model_b(args):
                 z2_onehot[:, 0] = 1.0  # animal
                 # Sample z1 from prior
                 z1_samples = prior_diffusion.p_sample(
-                    prior, shape=(16, 32), condition=z2_onehot
+                    prior, shape=(16, args.latent_dim), condition=z2_onehot
                 )
                 z1_samples = z1_samples / torch.norm(z1_samples, dim=1, keepdim=True)
                 # Sample images from decoder
                 samples = decoder_diffusion.p_sample(
-                    decoder, shape=(16, 3, 64, 64), condition=z1_samples
+                    decoder, shape=(16, 1, 64, 64), condition=z1_samples
                 )
                 visualize_samples(
                     samples,
@@ -261,11 +261,11 @@ def train_model_b(args):
                 z2_onehot = torch.zeros(16, 2, device=device)
                 z2_onehot[:, 1] = 1.0  # vehicle
                 z1_samples = prior_diffusion.p_sample(
-                    prior, shape=(16, 32), condition=z2_onehot
+                    prior, shape=(16, args.latent_dim), condition=z2_onehot
                 )
                 z1_samples = z1_samples / torch.norm(z1_samples, dim=1, keepdim=True)
                 samples = decoder_diffusion.p_sample(
-                    decoder, shape=(16, 3, 64, 64), condition=z1_samples
+                    decoder, shape=(16, 1, 64, 64), condition=z1_samples
                 )
                 visualize_samples(
                     samples,
@@ -323,6 +323,9 @@ def main():
     # Model parameters
     parser.add_argument(
         "--model_channels", type=int, default=64, help="Base number of channels in UNet"
+    )
+    parser.add_argument(
+        "--latent_dim", type=int, default=2, help="Dimension of z1 latent embeddings (use 2 for visualization)"
     )
     parser.add_argument(
         "--num_timesteps", type=int, default=1000, help="Number of diffusion timesteps"
