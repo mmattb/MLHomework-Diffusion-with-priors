@@ -29,7 +29,7 @@ class ImageDenoiser(nn.Module):
 
     def __init__(
         self,
-        image_channels: int = 3,
+        image_channels: int = 1,
         condition_dim: int = 2,  # For z2 one-hot encoding
         time_embed_dim: int = 128,
         model_channels: int = 64,
@@ -39,7 +39,7 @@ class ImageDenoiser(nn.Module):
         Initialize the image denoiser.
 
         Args:
-            image_channels: Number of image channels (3 for RGB)
+            image_channels: Number of image channels (1 for grayscale)
             condition_dim: Dimension of conditioning input
                           For Model A: 2 (z2 one-hot)
                           For Model B: 2 (z1 embedding)
@@ -85,7 +85,7 @@ class ImageDenoiser(nn.Module):
 
         Args:
             x_t: Noisy images at timestep t
-                Shape: (batch_size, 3, 64, 64)
+                Shape: (batch_size, 1, 64, 64)
                 Values: Normalized to [-1, 1]
 
             t: Diffusion timesteps
@@ -99,7 +99,7 @@ class ImageDenoiser(nn.Module):
 
         Returns:
             noise_pred: Predicted noise
-                Shape: (batch_size, 3, 64, 64)
+                Shape: (batch_size, 1, 64, 64)
 
         Implementation steps:
             1. Get time embeddings using self.time_embed(t)
@@ -115,9 +115,9 @@ class ImageDenoiser(nn.Module):
                - Result shape: (batch_size, time_embed_dim * 2)
 
             4. Pass through UNet: self.unet(x_t, combined)
-               - Input: x_t with shape (batch_size, 3, 64, 64)
+               - Input: x_t with shape (batch_size, 1, 64, 64)
                        combined with shape (batch_size, time_embed_dim * 2)
-               - Output: noise_pred with shape (batch_size, 3, 64, 64)
+               - Output: noise_pred with shape (batch_size, 1, 64, 64)
 
             5. Return the predicted noise
 
@@ -148,7 +148,7 @@ if __name__ == "__main__":
 
     # Create model
     model = ImageDenoiser(
-        image_channels=3,
+        image_channels=1,
         condition_dim=2,  # Model A: z2 one-hot
         time_embed_dim=128,
         model_channels=64,
@@ -160,7 +160,7 @@ if __name__ == "__main__":
 
     # Create dummy inputs
     batch_size = 4
-    x_t = torch.randn(batch_size, 3, 64, 64)
+    x_t = torch.randn(batch_size, 1, 64, 64)
     t = torch.randint(0, 1000, (batch_size,))
     condition = torch.randn(batch_size, 2)  # z2 one-hot
 

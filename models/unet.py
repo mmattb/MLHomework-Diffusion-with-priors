@@ -100,16 +100,16 @@ class SimpleUNet(nn.Module):
 
     def __init__(
         self,
-        in_channels: int = 3,
-        out_channels: int = 3,
+        in_channels: int = 1,
+        out_channels: int = 1,
         embed_dim: int = 256,
         base_channels: int = 64,
         channel_multipliers: tuple = (1, 2, 4),
     ):
         """
         Args:
-            in_channels: Number of input image channels (3 for RGB)
-            out_channels: Number of output channels (3 for RGB noise)
+            in_channels: Number of input image channels (1 for grayscale)
+            out_channels: Number of output channels (1 for grayscale noise)
             embed_dim: Dimension of combined embeddings
             base_channels: Base number of channels
             channel_multipliers: Channel multiplier at each resolution
@@ -181,9 +181,9 @@ class SimpleUNet(nn.Module):
 if __name__ == "__main__":
     # Test UNet
     batch_size = 2
-    unet = SimpleUNet(in_channels=3, out_channels=3, embed_dim=256, base_channels=64)
+    unet = SimpleUNet(in_channels=1, out_channels=1, embed_dim=256, base_channels=64)
 
-    x = torch.randn(batch_size, 3, 64, 64)
+    x = torch.randn(batch_size, 1, 64, 64)
     embed = torch.randn(batch_size, 256)
 
     out = unet(x, embed)

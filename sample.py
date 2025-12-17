@@ -31,7 +31,7 @@ def sample_model_a(args):
     # Create model
     print("Creating model...")
     model = ImageDenoiser(
-        image_channels=3,
+        image_channels=1,
         condition_dim=2,
         time_embed_dim=128,
         model_channels=args.model_channels,

@@ -100,7 +100,7 @@ class SyntheticHierarchicalDataset(Dataset):
 
     def _render_image(self, z1: str, z0: Dict) -> np.ndarray:
         """
-        Render a 64x64 RGB image based on z1 and z0.
+        Render a 64x64 grayscale image based on z1 and z0.
 
         Shape encoding:
             - dog: Circle
@@ -113,10 +113,10 @@ class SyntheticHierarchicalDataset(Dataset):
             z0: Style parameters dict
 
         Returns:
-            RGB image as numpy array, shape (64, 64, 3), dtype uint8
+            Grayscale image as numpy array, shape (64, 64), dtype uint8
         """
         # Create blank canvas
-        img = np.ones((self.image_size, self.image_size, 3), dtype=np.uint8) * 255
+        img = np.ones((self.image_size, self.image_size), dtype=np.uint8) * 255
 
         # Base position (center + jitter)
         center_x = int(self.image_size // 2 + z0["jitter_x"])
@@ -231,18 +231,11 @@ class SyntheticHierarchicalDataset(Dataset):
                 -1,
             )
 
-        # Apply color (hue and brightness)
-        # Convert to HSV, apply hue shift and brightness
-        img_hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HSV).astype(np.float32)
-
-        # Shift hue of non-white pixels
-        mask = img_hsv[:, :, 2] < 250  # Non-background pixels
-        img_hsv[mask, 0] = z0["hue"]
-        img_hsv[mask, 1] = 255  # Full saturation for colored parts
-        img_hsv[mask, 2] = img_hsv[mask, 2] * z0["brightness"]
-
-        img_hsv = np.clip(img_hsv, 0, 255).astype(np.uint8)
-        img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB)
+        # Apply brightness to grayscale image
+        img = img.astype(np.float32)
+        mask = img < 250  # Non-background pixels
+        img[mask] = img[mask] * z0["brightness"]
+        img = np.clip(img, 0, 255).astype(np.uint8)
 
         return img
 
@@ -255,7 +248,7 @@ class SyntheticHierarchicalDataset(Dataset):
 
         Returns:
             Dictionary containing:
-                - 'image': Tensor of shape (3, 64, 64), normalized to [-1, 1]
+                - 'image': Tensor of shape (1, 64, 64), normalized to [-1, 1]
                 - 'z2': Category index (0 or 1)
                 - 'z2_name': Category name string
                 - 'z1': Subtype index (0 or 1 within category)
@@ -269,7 +262,7 @@ class SyntheticHierarchicalDataset(Dataset):
 
         # Convert to torch tensor and normalize to [-1, 1]
         img_tensor = torch.from_numpy(img).float()
-        img_tensor = img_tensor.permute(2, 0, 1)  # (H, W, C) -> (C, H, W)
+        img_tensor = img_tensor.unsqueeze(0)  # (H, W) -> (1, H, W)
         img_tensor = (img_tensor / 127.5) - 1.0  # [0, 255] -> [-1, 1]
 
         # Convert categorical variables to indices
@@ -301,14 +294,14 @@ class SyntheticHierarchicalDataset(Dataset):
             num_refs: Number of reference images
 
         Returns:
-            Tensor of shape (num_refs, 3, 64, 64)
+            Tensor of shape (num_refs, 1, 64, 64)
         """
         refs = []
         for sample in self.samples:
             if sample["z1"] == z1:
                 img = self._render_image(sample["z1"], sample["z0"])
                 img_tensor = torch.from_numpy(img).float()
-                img_tensor = img_tensor.permute(2, 0, 1)
+                img_tensor = img_tensor.unsqueeze(0)
                 img_tensor = (img_tensor / 127.5) - 1.0
                 refs.append(img_tensor)
                 if len(refs) >= num_refs:
@@ -361,10 +354,10 @@ def visualize_dataset_samples(
 
     for i in range(min(num_samples, grid_size * grid_size)):
         sample = dataset[i]
-        img = sample["image"].permute(1, 2, 0).numpy()
+        img = sample["image"].squeeze(0).numpy()  # Remove channel dimension
         img = (img + 1.0) / 2.0  # [-1, 1] -> [0, 1]
 
-        axes[i].imshow(img)
+        axes[i].imshow(img, cmap='gray')
         axes[i].set_title(f"{sample['z2_name']}: {sample['z1_name']}", fontsize=6)
         axes[i].axis("off")
 
