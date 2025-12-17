@@ -318,8 +318,8 @@ The framework provides complete training loops, data generation, and scaffolding
 
 2. **Visualize z1 embeddings in 2D space** (Model B only):
    ```bash
-   python visualize_embeddings.py --checkpoint outputs/hierarchical/final.pt --z2 animal --num_samples 500
-   python visualize_embeddings.py --checkpoint outputs/hierarchical/final.pt --z2 vehicle --num_samples 500
+   python visualize_embeddings.py --checkpoint outputs/hierarchical/model_b_final.pt --z2 animal --num_samples 500
+   python visualize_embeddings.py --checkpoint outputs/hierarchical/model_b_final.pt --z2 vehicle --num_samples 500
    ```
    
    This creates two visualizations:
@@ -329,8 +329,8 @@ The framework provides complete training loops, data generation, and scaffolding
 3. **What to look for**:
    
    **For Model A (flat)**:
-   - Generated images should mostly be ONE type (all dogs or all cats)
-   - This is mode collapse!
+   - Generated images are likely unevenly distributed between two modes (e.g. mostly dogs or mostly cats), or exhibit some sort of mode averaging (e.g. mixing up the dog and cat concepts - perhaps having a mixed ear set).
+   - This is the issue which the hierarchical model is trying to solve.
    
    **For Model B (hierarchical)**:
    - z1 embeddings should cluster around **4 ground truth points** (dog, cat, car, truck)
