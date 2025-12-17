@@ -31,7 +31,7 @@ class ImageDenoiser(nn.Module):
         self,
         image_channels: int = 1,
         condition_dim: int = 2,  # For z2 one-hot encoding
-        time_embed_dim: int = 128,
+        time_embed_dim: int = 32,
         model_channels: int = 64,
         channel_multipliers: tuple = (1, 2, 4),
     ):
@@ -150,7 +150,7 @@ if __name__ == "__main__":
     model = ImageDenoiser(
         image_channels=1,
         condition_dim=2,  # Model A: z2 one-hot
-        time_embed_dim=128,
+        time_embed_dim=32,
         model_channels=64,
     )
 

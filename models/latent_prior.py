@@ -29,7 +29,7 @@ class LatentPrior(nn.Module):
         self,
         latent_dim: int = 2,
         condition_dim: int = 2,  # z2 one-hot encoding
-        time_embed_dim: int = 128,
+        time_embed_dim: int = 32,
         hidden_dims: tuple = (128, 128),
     ):
         """

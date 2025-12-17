@@ -49,9 +49,9 @@ def train_model_a(args):
     # Create model
     print("Creating model...")
     model = ImageDenoiser(
-        image_channels=3,
+        image_channels=1,
         condition_dim=2,  # z2 one-hot
-        time_embed_dim=128,
+        time_embed_dim=32,
         model_channels=args.model_channels,
     )
     num_params = sum(p.numel() for p in model.parameters())
@@ -163,13 +163,13 @@ def train_model_b(args):
     prior = LatentPrior(
         latent_dim=32,
         condition_dim=2,  # z2 one-hot
-        time_embed_dim=128,
+        time_embed_dim=32,
         hidden_dims=(256, 256, 256),
     )
     decoder = ImageDenoiser(
-        image_channels=3,
+        image_channels=1,
         condition_dim=32,  # z1 embedding
-        time_embed_dim=128,
+        time_embed_dim=32,
         model_channels=args.model_channels,
     )
 

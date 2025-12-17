@@ -46,7 +46,7 @@ def evaluate_model_a(args):
     model = ImageDenoiser(
         image_channels=3,
         condition_dim=2,
-        time_embed_dim=128,
+        time_embed_dim=32,
         model_channels=args.model_channels,
     )
     model = model.to(device)
@@ -134,12 +134,12 @@ def evaluate_model_b(args):
     # Create models
     print("Creating models...")
     prior = LatentPrior(
-        latent_dim=32, condition_dim=2, time_embed_dim=128, hidden_dims=(256, 256, 256)
+        latent_dim=32, condition_dim=2, time_embed_dim=32, hidden_dims=(256, 256, 256)
     )
     decoder = ImageDenoiser(
         image_channels=3,
         condition_dim=32,
-        time_embed_dim=128,
+        time_embed_dim=32,
         model_channels=args.model_channels,
     )
     prior = prior.to(device)
