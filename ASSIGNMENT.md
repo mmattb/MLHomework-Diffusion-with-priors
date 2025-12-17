@@ -357,7 +357,7 @@ The framework provides complete training loops, data generation, and scaffolding
 
 **What to implement**: The `compute_mode_coverage()` function.
 
-**Goal**: Now that you've seen mode collapse visually, implement a metric to quantify it.
+**Goal**: Now that you've seen mode collapse visually, implement a metric to quantify both coverage and distributional balance.
 
 **Inputs**:
 - `samples`: Generated images, shape `(num_samples, 1, 64, 64)`
@@ -368,17 +368,63 @@ The framework provides complete training loops, data generation, and scaffolding
 - A dictionary with:
   - `'num_modes_found'`: Integer count of distinct z1 modes identified
   - `'total_possible_modes'`: Integer count of ground truth z1 modes for this z2
-  - `'coverage_ratio'`: Float in [0, 1]
+  - `'coverage_ratio'`: Float in [0, 1] - fraction of modes covered
+  - `'mode_counts'`: Dict of counts per mode (e.g., `{'dog': 30, 'cat': 70}`)
+  - `'mode_proportions'`: Dict of proportions (e.g., `{'dog': 0.3, 'cat': 0.7}`)
+  - `'expected_proportions'`: Ground truth proportions from dataset (typically `{'dog': 0.5, 'cat': 0.5}`)
+  - `'proportion_error'`: Total variation distance from expected distribution
 
 **What you need to do**:
 1. For each generated sample, determine which ground truth z1 it most resembles
    - Hint: You can use a simple classifier or nearest neighbor matching
    - The dataset provides a method to get reference images for each z1
 2. Count the number of unique z1 modes found across all samples
-3. Compare to the total number of possible z1 modes for this z2
-4. Return the coverage statistics
+3. Compute the proportion of samples assigned to each mode
+4. Compare to ground truth proportions from `dataset.p_z1_given_z2[z2_condition]`
+5. Calculate total variation distance: `0.5 * sum(|actual - expected|)` for all modes
+6. Return all statistics
 
-**Learning goal**: Quantify what you observed visually in Part 5.
+**Learning goal**: Quantify both **mode collapse** (missing modes) and **mode imbalance** (wrong proportions).
+
+**Key insight**: Coverage ratio is binary (0.5 or 1.0 for 2 modes), but proportion error tells you if the model favors one mode over another. A perfect model has `proportion_error = 0.0`.
+
+**Testing your implementation**:
+
+After implementing `compute_mode_coverage()`, you can test it standalone:
+
+```bash
+# Quick test with Python (before implementing full evaluate.py)
+python -c "
+from data import get_dataloader
+from evaluation.metrics import compute_mode_coverage
+import torch
+
+# Load dataset
+_, dataset = get_dataloader(num_samples=100, batch_size=32)
+
+# Create fake samples for testing (replace with real model samples later)
+test_samples = torch.randn(50, 1, 64, 64)
+
+# Test the function
+result = compute_mode_coverage(test_samples, 'animal', dataset)
+print('Mode Coverage Results:')
+print(f\"  Modes found: {result['num_modes_found']}/{result['total_possible_modes']}\")
+print(f\"  Coverage ratio: {result['coverage_ratio']:.2f}\")
+print(f\"  Mode proportions: {result['mode_proportions']}\")
+print(f\"  Expected proportions: {result['expected_proportions']}\")
+print(f\"  Proportion error: {result['proportion_error']:.3f}\")
+"
+```
+
+Once implemented, evaluate your trained models:
+
+```bash
+# Evaluate Model A (should show mode collapse/averaging)
+python evaluate.py --model flat --checkpoint outputs/flat/model_a_final.pt --num_eval_samples 200
+
+# Evaluate Model B (should show better coverage and balance)
+python evaluate.py --model hierarchical --checkpoint outputs/hierarchical/model_b_final.pt --num_eval_samples 200
+```
 
 **Status**: ⬜ Not implemented
 

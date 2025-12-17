@@ -13,7 +13,7 @@ from sklearn.cluster import KMeans
 
 
 def compute_mode_coverage(
-    samples: torch.Tensor, z2_condition: str, dataset, method: str = "nearest_neighbor"
+    samples: torch.Tensor, z2_condition: str, dataset
 ) -> Dict[str, float]:
     """
     Compute mode coverage metric.
@@ -21,7 +21,7 @@ def compute_mode_coverage(
     ★★★ TODO: IMPLEMENT THIS FUNCTION ★★★
 
     Measures how many distinct z1 categories are recovered when sampling
-    conditioned on z2.
+    conditioned on z2, and how well the distribution matches ground truth.
 
     Args:
         samples: Generated images
@@ -34,16 +34,15 @@ def compute_mode_coverage(
         dataset: The SyntheticHierarchicalDataset object
             Provides ground truth information and reference images
 
-        method: Method for classification
-            'nearest_neighbor': Match to closest reference image
-            'feature_matching': Use simple feature matching
-
     Returns:
         Dictionary containing:
             - 'num_modes_found': Number of distinct z1 modes identified
             - 'total_possible_modes': Total number of z1 modes for this z2
             - 'coverage_ratio': Fraction of modes covered (in [0, 1])
             - 'mode_counts': Dictionary mapping z1 names to counts
+            - 'mode_proportions': Dictionary mapping z1 names to proportions
+            - 'expected_proportions': Ground truth proportions from dataset
+            - 'proportion_error': Total variation distance from expected
 
     Implementation approach:
         1. Get the possible z1 subtypes for the given z2
@@ -66,14 +65,22 @@ def compute_mode_coverage(
         4. Compute coverage ratio
            - coverage_ratio = num_modes_found / total_possible_modes
 
-        5. Return the statistics
+        5. Compute mode proportions
+           - For each z1: proportion = count / total_samples
+           - Get expected proportions: dataset.p_z1_given_z2[z2_condition]
+           - Compute total variation distance: 0.5 * sum(|actual - expected|)
+
+        6. Return the statistics
 
     Example return value:
         {
             'num_modes_found': 2,
             'total_possible_modes': 2,
             'coverage_ratio': 1.0,
-            'mode_counts': {'dog': 8, 'cat': 8}
+            'mode_counts': {'dog': 30, 'cat': 70},
+            'mode_proportions': {'dog': 0.30, 'cat': 0.70},
+            'expected_proportions': {'dog': 0.5, 'cat': 0.5},
+            'proportion_error': 0.20
         }
 
     Tips:
@@ -81,6 +88,7 @@ def compute_mode_coverage(
         - MSE in pixel space works reasonably for this synthetic dataset
         - You can average over multiple reference images per z1
         - Consider normalizing distances before comparing
+        - Total variation distance measures distributional mismatch
     """
     # ============================================================
     # YOUR CODE HERE
