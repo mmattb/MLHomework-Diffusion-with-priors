@@ -72,13 +72,13 @@ class DownBlock(nn.Module):
 class UpBlock(nn.Module):
     """Upsampling block with skip connection."""
 
-    def __init__(self, in_channels: int, out_channels: int, embed_dim: int):
+    def __init__(self, in_channels: int, skip_channels: int, out_channels: int, embed_dim: int):
         super().__init__()
         self.upsample = nn.ConvTranspose2d(
             in_channels, in_channels, 4, stride=2, padding=1
         )
         self.res_block = ResidualBlock(
-            in_channels + out_channels, out_channels, embed_dim
+            in_channels + skip_channels, out_channels, embed_dim
         )
 
     def forward(
@@ -136,8 +136,12 @@ class SimpleUNet(nn.Module):
         # Upsampling path
         self.up_blocks = nn.ModuleList()
         channels_reversed = list(reversed(channels))
-        for i, out_ch in enumerate(channels_reversed[1:] + [base_channels]):
-            self.up_blocks.append(UpBlock(channels_reversed[i], out_ch, embed_dim))
+        for i in range(len(channels_reversed)):
+            in_ch = channels_reversed[i]  # Channels from below
+            skip_ch = channels_reversed[i]  # Channels from skip connection
+            out_ch = channels_reversed[i + 1] if i + 1 < len(channels_reversed) else base_channels
+            # UpBlock: upsample in_ch, concatenate with skip_ch, output out_ch
+            self.up_blocks.append(UpBlock(in_ch, skip_ch, out_ch, embed_dim))
 
         # Final convolution
         self.final_conv = nn.Sequential(
