@@ -74,6 +74,8 @@ def visualize_z1_embeddings(args):
         z1_samples = diffusion.p_sample(
             prior, shape=(args.num_samples, 2), condition=z2_onehot
         )
+        # Normalize to unit circle (z1 embeddings are L2-normalized)
+        z1_samples = z1_samples / torch.norm(z1_samples, dim=1, keepdim=True)
 
     z1_samples_np = z1_samples.cpu().numpy()
 

@@ -25,7 +25,7 @@ def compute_mode_coverage(
 
     Args:
         samples: Generated images
-            Shape: (num_samples, 3, 64, 64)
+            Shape: (num_samples, 1, 64, 64)
             Values: Normalized to [-1, 1]
 
         z2_condition: The z2 category used for conditioning
@@ -112,7 +112,7 @@ def compute_conditional_entropy(
 
     Args:
         z1_samples: Sampled latent embeddings from the prior
-            Shape: (num_samples, 32)
+            Shape: (num_samples, 2)
             Values: L2-normalized embeddings
 
         z2_condition: The z2 category used for conditioning
@@ -189,7 +189,7 @@ def compute_kl_divergence(
 
     Args:
         z1_samples: Sampled latent embeddings from the model
-            Shape: (num_samples, 32)
+            Shape: (num_samples, 2)
             Values: L2-normalized embeddings
 
         z2_condition: The z2 category used for conditioning
@@ -287,20 +287,20 @@ def evaluate_model(
             # Sample z1 from prior
             with torch.no_grad():
                 z1_samples = prior_diffusion.p_sample(
-                    prior, shape=(num_samples, 32), condition=z2_onehot
+                    prior, shape=(num_samples, 2), condition=z2_onehot
                 )
                 # Normalize z1 samples
                 z1_samples = z1_samples / torch.norm(z1_samples, dim=1, keepdim=True)
 
                 # Sample images from decoder
                 samples = decoder_diffusion.p_sample(
-                    decoder, shape=(num_samples, 3, 64, 64), condition=z1_samples
+                    decoder, shape=(num_samples, 1, 64, 64), condition=z1_samples
                 )
         else:
             # Model A: Sample directly from model
             with torch.no_grad():
                 samples = diffusion.p_sample(
-                    model, shape=(num_samples, 3, 64, 64), condition=z2_onehot
+                    model, shape=(num_samples, 1, 64, 64), condition=z2_onehot
                 )
             z1_samples = None  # Not applicable for Model A
 
@@ -347,8 +347,8 @@ if __name__ == "__main__":
 
     # Create dummy data
     num_samples = 16
-    samples = torch.randn(num_samples, 3, 64, 64)
-    z1_samples = torch.randn(num_samples, 32)
+    samples = torch.randn(num_samples, 1, 64, 64)
+    z1_samples = torch.randn(num_samples, 2)
     z1_samples = z1_samples / torch.norm(z1_samples, dim=1, keepdim=True)
 
     # This would need a real dataset
