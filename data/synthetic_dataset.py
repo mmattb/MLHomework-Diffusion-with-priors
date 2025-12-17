@@ -55,21 +55,23 @@ class SyntheticHierarchicalDataset(Dataset):
         # Animals get top half of circle (0° to 180°), vehicles get bottom half (180° to 360°)
         np.random.seed(seed)
         self.z1_embeddings = {}
-        
+
         # Assign distinct angular regions for each z2 category
         z2_angle_ranges = {
-            "animal": (0, np.pi),      # 0° to 180° (top semicircle)
-            "vehicle": (np.pi, 2*np.pi)  # 180° to 360° (bottom semicircle)
+            "animal": (0, np.pi),  # 0° to 180° (top semicircle)
+            "vehicle": (np.pi, 2 * np.pi),  # 180° to 360° (bottom semicircle)
         }
-        
+
         for z2 in self.z2_categories:
             angle_min, angle_max = z2_angle_ranges[z2]
             z1_list = self.z1_subtypes[z2]
-            
+
             # Evenly space subtypes within this category's angular range
             for i, z1 in enumerate(z1_list):
                 # Place subtypes evenly within the range, with some spacing from boundaries
-                angle = angle_min + (angle_max - angle_min) * (i + 1) / (len(z1_list) + 1)
+                angle = angle_min + (angle_max - angle_min) * (i + 1) / (
+                    len(z1_list) + 1
+                )
                 vec = np.array([np.cos(angle), np.sin(angle)])
                 self.z1_embeddings[z1] = vec
 
@@ -98,8 +100,12 @@ class SyntheticHierarchicalDataset(Dataset):
                 "jitter_x": np.random.uniform(-5, 5),
                 "jitter_y": np.random.uniform(-5, 5),
                 "scale": np.random.uniform(0.8, 1.2),
-                "nose_offset_y": np.random.uniform(-3, 3) if z1 == "dog" else 0,  # Dogs have varying nose position
-                "nose_size": np.random.uniform(2, 5) if z1 == "dog" else 3,  # Dogs have varying nose size
+                "nose_offset_y": (
+                    np.random.uniform(-3, 3) if z1 == "dog" else 0
+                ),  # Dogs have varying nose position
+                "nose_size": (
+                    np.random.uniform(2, 5) if z1 == "dog" else 3
+                ),  # Dogs have varying nose size
             }
 
             self.samples.append(
@@ -370,7 +376,7 @@ def visualize_dataset_samples(
         img = sample["image"].squeeze(0).numpy()  # Remove channel dimension
         img = (img + 1.0) / 2.0  # [-1, 1] -> [0, 1]
 
-        axes[i].imshow(img, cmap='gray')
+        axes[i].imshow(img, cmap="gray")
         axes[i].set_title(f"{sample['z2_name']}: {sample['z1_name']}", fontsize=6)
         axes[i].axis("off")
 

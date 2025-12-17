@@ -308,10 +308,10 @@ The framework provides complete training loops, data generation, and scaffolding
 1. **Generate samples from both models**:
    ```bash
    # Model A samples (should show mode collapse)
-   python sample.py --model flat --checkpoint outputs/flat/final.pt --z2 animal --num_samples 16
+   python sample.py --model flat --checkpoint outputs/flat/model_a_final.pt --z2 animal --num_samples 16
    
    # Model B samples (should show diversity)
-   python sample.py --model hierarchical --checkpoint outputs/hierarchical/final.pt --z2 animal --num_samples 16
+   python sample.py --model hierarchical --checkpoint outputs/hierarchical/model_b_final.pt --z2 animal --num_samples 16
    ```
    
    Look at the generated images - do you see both dogs AND cats, or just one type?

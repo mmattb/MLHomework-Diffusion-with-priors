@@ -97,11 +97,11 @@ def sample_model_b(args):
     # Create models
     print("Creating models...")
     prior = LatentPrior(
-        latent_dim=32, condition_dim=2, time_embed_dim=32, hidden_dims=(256, 256, 256)
+        latent_dim=2, condition_dim=2, time_embed_dim=32, hidden_dims=(256, 256, 256)
     )
     decoder = ImageDenoiser(
         image_channels=1,
-        condition_dim=32,
+        condition_dim=2,
         time_embed_dim=32,
         model_channels=args.model_channels,
     )
@@ -143,14 +143,14 @@ def sample_model_b(args):
         if args.use_ddim:
             z1_samples = prior_diffusion.ddim_sample(
                 prior,
-                shape=(args.num_samples, 32),
+                shape=(args.num_samples, 2),
                 condition=z2_onehot,
                 num_steps=args.ddim_steps,
                 eta=args.ddim_eta,
             )
         else:
             z1_samples = prior_diffusion.p_sample(
-                prior, shape=(args.num_samples, 32), condition=z2_onehot
+                prior, shape=(args.num_samples, 2), condition=z2_onehot
             )
 
         # Normalize z1 samples

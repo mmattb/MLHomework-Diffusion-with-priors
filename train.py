@@ -325,7 +325,10 @@ def main():
         "--model_channels", type=int, default=64, help="Base number of channels in UNet"
     )
     parser.add_argument(
-        "--latent_dim", type=int, default=2, help="Dimension of z1 latent embeddings (use 2 for visualization)"
+        "--latent_dim",
+        type=int,
+        default=2,
+        help="Dimension of z1 latent embeddings (use 2 for visualization)",
     )
     parser.add_argument(
         "--num_timesteps", type=int, default=1000, help="Number of diffusion timesteps"

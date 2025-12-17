@@ -15,7 +15,8 @@ from typing import Dict, Optional
 
 # Set matplotlib to non-interactive backend before importing pyplot
 import matplotlib
-matplotlib.use('Agg')
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -305,7 +306,7 @@ def visualize_samples(
         if samples.shape[1] == 1:
             # Grayscale - squeeze channel dimension
             img = samples[i, 0].numpy()
-            axes[i].imshow(img, cmap='gray')
+            axes[i].imshow(img, cmap="gray")
         else:
             # RGB
             img = samples[i].permute(1, 2, 0).numpy()
