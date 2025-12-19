@@ -294,11 +294,16 @@ def evaluate_model(
 
             # Sample z1 from prior
             with torch.no_grad():
-                z1_samples = prior_diffusion.p_sample(
-                    prior, shape=(num_samples, 2), condition=z2_onehot
-                )
-                # Normalize z1 samples
-                z1_samples = z1_samples / torch.norm(z1_samples, dim=1, keepdim=True)
+                # Check if prior is categorical (has embedding_table) or diffusion-based
+                from models import CategoricalPrior
+                if isinstance(prior, CategoricalPrior):
+                    z1_samples = prior(z2_onehot)
+                else:
+                    z1_samples = prior_diffusion.p_sample(
+                        prior, shape=(num_samples, 2), condition=z2_onehot
+                    )
+                    # Normalize z1 samples
+                    z1_samples = z1_samples / torch.norm(z1_samples, dim=1, keepdim=True)
 
                 # Sample images from decoder
                 samples = decoder_diffusion.p_sample(

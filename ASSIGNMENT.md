@@ -162,12 +162,12 @@ The framework provides complete training loops, data generation, and scaffolding
 **What to implement**: The `forward()` method of the `ImageDenoiser` class.
 
 **Input shapes**:
-- `x_t`: Noisy images at timestep t, shape `(batch_size, 3, 64, 64)`
+- `x_t`: Noisy images at timestep t, shape `(batch_size, 1, 64, 64)`
 - `t`: Diffusion timestep, shape `(batch_size,)` - integers in [0, num_timesteps-1]
 - `condition`: Conditioning information, shape `(batch_size, condition_dim)`
 
 **Expected output**:
-- `noise_pred`: Predicted noise, shape `(batch_size, 3, 64, 64)`
+- `noise_pred`: Predicted noise, shape `(batch_size, 1, 64, 64)`
 
 **What you need to do**:
 1. Use `self.time_embed(t)` to get time embeddings
@@ -197,26 +197,75 @@ The framework provides complete training loops, data generation, and scaffolding
 - `z1_t`: Noisy latent embeddings at timestep t, shape `(batch_size, latent_dim)`
   - In our case, `latent_dim = 2`
 - `t`: Diffusion timestep, shape `(batch_size,)` - integers in [0, num_timesteps-1]
+## Part 2: Latent Prior for Model B (★★☆)
+
+**Goal**: Implement a prior that learns p(z1 | z2) to provide structured latent embeddings.
+
+**Important Note**: We provide TWO implementations of the prior:
+
+### Option A: Categorical Prior (Recommended) ✅
+
+A simple categorical distribution that directly models discrete z1 modes:
+- **File**: `models/categorical_prior.py` (already implemented!)
+- **Advantages**: Fast, interpretable, appropriate for discrete modes
+- **How it works**: z2 → MLP → logits → sample discrete z1 → lookup embedding
+- **Training**: Maximizes log p(z1|z2) using cross-entropy loss
+
+This is the **recommended and default approach**.
+
+### Option B: Diffusion Prior (Educational) 
+
+A diffusion model in latent space (similar to DALL-E 2):
+- **File**: `models/latent_prior.py`
+- **What to implement**: The `forward()` method
+- **Advantages**: More general, works for continuous high-dimensional latent spaces
+- **Disadvantages**: Overkill for 4 discrete modes, slower, produces "smeared" distributions
+- **How it works**: Learns to denoise z1 conditioned on z2
+
+**★★★ TODO (Optional)**: Implement the `forward()` method in `models/latent_prior.py`
+
+**Input shapes**:
+- `z1_t`: Noisy z1 at timestep t, shape `(batch_size, latent_dim)`
+- `t`: Diffusion timestep, shape `(batch_size,)`
 - `condition`: Category conditioning (z2), shape `(batch_size, condition_dim)`
 
 **Expected output**:
 - `noise_pred`: Predicted noise in latent space, shape `(batch_size, latent_dim)`
 
-**What you need to do**:
+**What you need to do** (for diffusion prior):
 1. Use `self.time_embed(t)` to get time embeddings
 2. Use `self.condition_embed(condition)` to get condition embeddings
 3. Concatenate z1_t with the embedded time and condition
 4. Pass through the MLP layers
 5. Return the predicted noise
 
-**Architecture provided**:
-- `self.time_embed`: Sinusoidal time embedding module
-- `self.condition_embed`: Linear projection for category conditioning
-- `self.mlp`: Multi-layer perceptron (already implemented)
+**Key Insight**: Hierarchical priors can use ANY generative model!
+- DALL-E 2 uses diffusion because CLIP embeddings are 512-dimensional and continuous
+- We use categorical because our z1 space has 4 discrete modes
+- Other options: Autoregressive models, VAEs, normalizing flows, etc.
 
-**Learning goal**: Understand how diffusion works in latent space and how priors are conditioned.
+**To switch between priors**:
+```bash
+# Use categorical prior (default, recommended)
+python train.py --model hierarchical --prior_type categorical
 
-**Status**: ⬜ Not implemented
+# Use diffusion prior (educational, slower)
+python train.py --model hierarchical --prior_type diffusion
+```
+
+### Why Diffusion Prior Produces "Smeared" Modes
+
+If you use the diffusion prior (`--prior_type diffusion`), you'll notice the sampled z1 embeddings spread continuously along the semicircle rather than clustering tightly at the 4 ground truth points. This happens because:
+
+1. **Gaussian noise destroys discrete structure**: At high noise levels, the 4 modes become indistinguishable
+2. **Score matching learns smooth functions**: The model approximates the bimodal distribution with a smooth Gaussian
+3. **Stochastic sampling adds variance**: Each reverse diffusion step adds noise
+
+**This is a fundamental limitation of continuous Gaussian diffusion for discrete/categorical data.**
+
+The categorical prior avoids this by directly modeling the discrete distribution, giving clean mode separation. This illustrates an important principle: **choose your generative model to match your data structure**.
+
+**Status**: ⬜ Not implemented (optional for diffusion prior)
 
 ---
 
@@ -269,31 +318,39 @@ The framework provides complete training loops, data generation, and scaffolding
 
 1. **Train Model B** (hierarchical model):
    ```bash
-   python train.py --model hierarchical --epochs 50 --output_dir outputs/hierarchical
+   python train.py --model hierarchical --prior_type categorical --epochs 50 --batch_size 32 --output_dir outputs/model_b_categorical 
    ```
    
    This trains:
-   - LatentPrior: p(z1 | z2) - diffusion over latent embeddings
+   - CategoricalPrior: p(z1 | z2) - categorical distribution over z1 (default)
    - ImageDecoder: p(image | z1) - diffusion over images
+   
+   Or to use the diffusion prior (less accurate, for educational purposes):
+   ```bash
+   python train.py --model hierarchical --prior_type diffusion --epochs 50 --output_dir outputs/hierarchical
+   ```
 
 2. **Monitor training**:
    - You'll see TWO losses: `prior_loss` and `decoder_loss`
    - Both should decrease during training
-   - Takes ~20-30 minutes on GPU, ~2-3 hours on CPU
+   - Takes ~20-30 minutes on GPU, ~2-3 hours on CPU (categorical is faster)
    - Checkpoints saved to `outputs/hierarchical/`
 
 3. **What to expect**:
    - Two-stage training process
    - Model learns to factorize: first sample z1, then generate image
    - Should preserve mode diversity (both dogs AND cats)
+   - Clean, discrete modes with categorical prior
 
 **Command options**:
 - `--model hierarchical`: Use the hierarchical architecture
+- `--prior_type categorical`: Use categorical prior (default, recommended)
+- `--prior_type diffusion`: Use diffusion prior (educational, optional)
 - `--epochs 50`: Train for 50 epochs
 - `--latent_dim 2`: Size of z1 embeddings (use 2 for visualization!)
 - `--output_dir outputs/hierarchical`: Where to save checkpoints
 
-**Learning goal**: Understand how hierarchical structure prevents mode collapse.
+**Learning goal**: Understand how hierarchical structure prevents mode collapse, and how to choose appropriate generative models for different data types.
 
 **Status**: ⬜ Not trained
 
@@ -314,13 +371,16 @@ The framework provides complete training loops, data generation, and scaffolding
    python sample.py --model hierarchical --checkpoint outputs/hierarchical/model_b_final.pt --z2 animal --num_samples 16
    ```
    
-   Look at the generated images - do you see both dogs AND cats, or just one type?
+   Look at the generated images - do you see both dogs AND cats, or just one type, or perhaps some averaging (e.g. dog and cat ears on the same animal)?
 
-2. **Visualize z1 embeddings in 2D space** (Model B only):
+2. **Visualize z1 embeddings in 2D space** (Model B with diffusion prior only):
    ```bash
+   # Only if you used --prior_type diffusion
    python visualize_embeddings.py --checkpoint outputs/hierarchical/model_b_final.pt --z2 animal --num_samples 500
    python visualize_embeddings.py --checkpoint outputs/hierarchical/model_b_final.pt --z2 vehicle --num_samples 500
    ```
+   
+   **Note**: This visualization only makes sense for the **diffusion-based prior**, which produces continuous distributions in latent space. The **categorical prior** samples discrete modes directly, so the scatter plot would just show the 4 fixed embedding points.
    
    This creates two visualizations:
    - **Scatter plot**: Shows where z1 samples land in 2D space
@@ -333,11 +393,13 @@ The framework provides complete training loops, data generation, and scaffolding
    - This is the issue which the hierarchical model is trying to solve.
    
    **For Model B (hierarchical)**:
-   - z1 embeddings should cluster around **4 ground truth points** (dog, cat, car, truck)
-   - You should see **2 clusters** for "animal" (dog and cat)
-   - You should see **2 clusters** for "vehicle" (car and truck)
-   - Histogram should show relatively balanced counts
-   - Generated images should show BOTH types
+   - Generated images should show BOTH types with no mixture of concepts
+   - With **categorical prior** (default): Direct discrete sampling ensures clean mode separation
+   - With **diffusion prior** (optional): z1 embeddings cluster around **4 ground truth points** (dog, cat, car, truck)
+     - You should see **2 clusters** for "animal" (dog and cat)
+     - You should see **2 clusters** for "vehicle" (car and truck)
+     - Histogram should show relatively balanced counts
+     - Embeddings may be "smeared" along the semicircle due to diffusion's continuous nature
 
 **Why 4 lumps?**:
 - z1 has dimension 2 and is L2-normalized (lies on unit circle)
@@ -430,13 +492,17 @@ python evaluate.py --model hierarchical --checkpoint outputs/hierarchical/model_
 
 ---
 
-## Part 7: Conditional Entropy (★★☆)
+## Part 7: Conditional Entropy (★★☆) [OPTIONAL - Diffusion Prior Only]
+
+**⚠️ Note**: This part only applies if you implemented the **diffusion-based prior** (`--prior_type diffusion`). If you're using the **categorical prior** (default), skip to Part 9.
 
 **File**: `evaluation/metrics.py`
 
 **What to implement**: The `compute_conditional_entropy()` function.
 
 **Goal**: Compute H(z1_hat | z2) to measure uncertainty in the latent space.
+
+**Why optional?**: The categorical prior directly learns discrete probabilities, so you can compute entropy analytically from the model's logits. This metric is more useful for continuous priors (like diffusion) where you need to estimate the distribution from samples.
 
 **Inputs**:
 - `z1_samples`: Sampled latent embeddings from the prior, shape `(num_samples, latent_dim)`
@@ -453,19 +519,23 @@ python evaluate.py --model hierarchical --checkpoint outputs/hierarchical/model_
 3. Compute entropy: H = -∑ p(z1|z2) log p(z1|z2)
 4. Return the entropy value
 
-**Learning goal**: Measure diversity in latent representations numerically.
+**Learning goal**: Measure diversity in latent representations numerically for continuous priors.
 
-**Status**: ⬜ Not implemented
+**Status**: ⬜ Not implemented (optional)
 
 ---
 
-## Part 8: KL Divergence (★★★)
+## Part 8: KL Divergence (★★★) [OPTIONAL - Diffusion Prior Only]
+
+**⚠️ Note**: This part only applies if you implemented the **diffusion-based prior** (`--prior_type diffusion`). If you're using the **categorical prior** (default), skip to Part 9.
 
 **File**: `evaluation/metrics.py`
 
 **What to implement**: The `compute_kl_divergence()` function.
 
 **Goal**: Compute KL(p_model(z1 | z2) || p_data(z1 | z2)) to measure distribution mismatch.
+
+**Why optional?**: For the categorical prior, you can compute KL analytically from the learned logits during training. This metric is more useful for the diffusion prior where the distribution is implicit and must be estimated from samples.
 
 **Inputs**:
 - `z1_samples`: Sampled latent embeddings from the model, shape `(num_samples, latent_dim)`
@@ -484,9 +554,9 @@ python evaluate.py --model hierarchical --checkpoint outputs/hierarchical/model_
 4. Handle numerical stability (log(0), division by zero)
 5. Return the KL divergence
 
-**Learning goal**: Compare model distributions to ground truth quantitatively.
+**Learning goal**: Compare model distributions to ground truth quantitatively for continuous priors.
 
-**Status**: ⬜ Not implemented
+**Status**: ⬜ Not implemented (optional)
 
 ---
 
@@ -513,8 +583,9 @@ python evaluate.py --model hierarchical --checkpoint outputs/hierarchical/model_
 
 3. **Compare results**:
    - **Mode coverage**: Model A ≈ 0.5 (collapses), Model B ≈ 1.0 (diverse)
-   - **Conditional entropy**: Model A low, Model B high
-   - **KL divergence**: Model A high, Model B low
+   - **Proportion error**: Model A high (imbalanced), Model B low (balanced)
+   - **(Optional, diffusion prior only)** Conditional entropy: Model A low, Model B high
+   - **(Optional, diffusion prior only)** KL divergence: Model A high, Model B low
    - Check generated images in output folders
 
 4. **Analyze**:
@@ -534,9 +605,17 @@ If your implementation is correct:
 
 - **Model A (flat)** should show mode collapse: samples for "animal" will mostly be one type (e.g., all dogs or all cats)
 - **Model B (hierarchical)** should show diversity: samples for "animal" will include both dogs and cats
-- Mode coverage should be low (~0.5) for Model A, high (~1.0) for Model B
+- **Proportion error** should be high for Model A, low (~0.0) for Model B
+
+**If using diffusion prior** (optional):
 - Conditional entropy should be low for Model A, higher for Model B
 - KL divergence should be high for Model A, low for Model B
+- z1 embeddings will show continuous distributions with some "smearing"
+
+**If using categorical prior** (default):
+- z1 sampling produces exact discrete modes (no smearing)
+- Prior loss converges to ~0.693 (ln(2), perfect for 2 equally likely modes per category)
+- Faster training and cleaner mode separation
 
 ---
 

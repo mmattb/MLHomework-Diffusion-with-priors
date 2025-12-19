@@ -13,7 +13,7 @@ import argparse
 import torch
 from pathlib import Path
 
-from models import ImageDenoiser, LatentPrior
+from models import ImageDenoiser, LatentPrior, CategoricalPrior
 from diffusion import DiffusionProcess
 from training import visualize_samples
 
@@ -94,11 +94,30 @@ def sample_model_b(args):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Using device: {device}")
 
-    # Create models
+    # Load checkpoint to detect prior type
+    print(f"Loading checkpoint from {args.checkpoint}...")
+    checkpoint = torch.load(args.checkpoint, map_location=device)
+    prior_type = checkpoint.get("prior_type", "diffusion")
+    print(f"Detected prior type: {prior_type}")
+    print()
+
+    # Create models based on prior type
     print("Creating models...")
-    prior = LatentPrior(
-        latent_dim=2, condition_dim=2, time_embed_dim=32, hidden_dims=(256, 256, 256)
-    )
+    from data import get_dataloader
+    _, dataset = get_dataloader(num_samples=100, batch_size=32, shuffle=False, num_workers=0)
+    
+    if prior_type == "categorical":
+        prior = CategoricalPrior(
+            z1_embeddings=dataset.z1_embeddings,
+            z1_subtypes=dataset.z1_subtypes,
+            condition_dim=2,
+            hidden_dim=256,
+        )
+    else:
+        prior = LatentPrior(
+            latent_dim=2, condition_dim=2, time_embed_dim=32, hidden_dims=(256, 256, 256)
+        )
+    
     decoder = ImageDenoiser(
         image_channels=1,
         condition_dim=2,
@@ -108,9 +127,7 @@ def sample_model_b(args):
     prior = prior.to(device)
     decoder = decoder.to(device)
 
-    # Load checkpoint
-    print(f"Loading checkpoint from {args.checkpoint}...")
-    checkpoint = torch.load(args.checkpoint, map_location=device)
+    # Load state dicts
     prior.load_state_dict(checkpoint["prior_state_dict"])
     decoder.load_state_dict(checkpoint["decoder_state_dict"])
     prior.eval()
@@ -140,21 +157,24 @@ def sample_model_b(args):
     with torch.no_grad():
         # Sample z1 from prior
         print("  Sampling z1 from prior...")
-        if args.use_ddim:
-            z1_samples = prior_diffusion.ddim_sample(
-                prior,
-                shape=(args.num_samples, 2),
-                condition=z2_onehot,
-                num_steps=args.ddim_steps,
-                eta=args.ddim_eta,
-            )
+        if prior_type == "categorical":
+            z1_samples = prior(z2_onehot)
         else:
-            z1_samples = prior_diffusion.p_sample(
-                prior, shape=(args.num_samples, 2), condition=z2_onehot
-            )
+            if args.use_ddim:
+                z1_samples = prior_diffusion.ddim_sample(
+                    prior,
+                    shape=(args.num_samples, 2),
+                    condition=z2_onehot,
+                    num_steps=args.ddim_steps,
+                    eta=args.ddim_eta,
+                )
+            else:
+                z1_samples = prior_diffusion.p_sample(
+                    prior, shape=(args.num_samples, 2), condition=z2_onehot
+                )
 
-        # Normalize z1 samples
-        z1_samples = z1_samples / torch.norm(z1_samples, dim=1, keepdim=True)
+            # Normalize z1 samples
+            z1_samples = z1_samples / torch.norm(z1_samples, dim=1, keepdim=True)
 
         # Sample images from decoder
         print("  Sampling images from decoder...")

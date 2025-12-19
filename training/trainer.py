@@ -59,7 +59,7 @@ class TrainerModelA:
         pbar = tqdm(dataloader, desc="Training")
         for batch in pbar:
             # Get data
-            images = batch["image"].to(self.device)  # (B, 3, 64, 64)
+            images = batch["image"].to(self.device)  # (B, 1, 64, 64)
             z2 = batch["z2"].to(self.device)  # (B,)
 
             # Create z2 one-hot encoding for conditioning
@@ -123,20 +123,20 @@ class TrainerModelA:
 
 class TrainerModelB:
     """
-    Trainer for Model B: Hierarchical diffusion with latent prior.
+    Trainer for Model B: Hierarchical model with latent prior.
 
     This model has two components:
-    1. Latent prior: p(z1 | z2) in latent space
+    1. Latent prior: p(z1 | z2) - can be diffusion-based OR categorical
     2. Image decoder: p(image | z1) in image space
 
-    Training alternates between or jointly trains both components.
+    Training jointly trains both components.
     """
 
     def __init__(
         self,
-        prior: LatentPrior,
+        prior: nn.Module,  # Can be LatentPrior or CategoricalPrior
         decoder: ImageDenoiser,
-        prior_diffusion: DiffusionProcess,
+        prior_diffusion: DiffusionProcess,  # Can be None for categorical prior
         decoder_diffusion: DiffusionProcess,
         prior_optimizer: optim.Optimizer,
         decoder_optimizer: optim.Optimizer,
@@ -150,6 +150,9 @@ class TrainerModelB:
         self.decoder_optimizer = decoder_optimizer
         self.device = device
         self.step = 0
+        
+        # Check if using categorical prior
+        self.use_categorical_prior = prior_diffusion is None
 
     def train_epoch(self, dataloader: DataLoader) -> Dict[str, float]:
         """
@@ -172,28 +175,33 @@ class TrainerModelB:
             batch_size = batch["image"].shape[0]
 
             # Get data
-            images = batch["image"].to(self.device)  # (B, 3, 64, 64)
+            images = batch["image"].to(self.device)  # (B, 1, 64, 64)
             z2 = batch["z2"].to(self.device)  # (B,)
-            z1_embedding = batch["z1_embedding"].to(self.device)  # (B, 32)
+            z1_embedding = batch["z1_embedding"].to(self.device)  # (B, 2)
 
             # Create z2 one-hot encoding
             z2_onehot = torch.zeros(batch_size, 2, device=self.device)
             z2_onehot.scatter_(1, z2.unsqueeze(1), 1.0)
 
             # ===== Train Prior: p(z1 | z2) =====
-            # Sample random timesteps for prior
-            t_prior = torch.randint(
-                0, self.prior_diffusion.num_timesteps, (batch_size,), device=self.device
-            )
+            if self.use_categorical_prior:
+                # Categorical prior: maximize log p(z1 | z2)
+                log_probs = self.prior.get_log_probs(z2_onehot, z1_embedding)
+                prior_loss = -log_probs.mean()  # Negative log likelihood
+            else:
+                # Diffusion prior: predict noise
+                t_prior = torch.randint(
+                    0, self.prior_diffusion.num_timesteps, (batch_size,), device=self.device
+                )
 
-            # Forward diffusion in latent space
-            noisy_z1, noise_z1 = self.prior_diffusion.q_sample(z1_embedding, t_prior)
+                # Forward diffusion in latent space
+                noisy_z1, noise_z1 = self.prior_diffusion.q_sample(z1_embedding, t_prior)
 
-            # Predict noise in latent space
-            noise_pred_prior = self.prior(noisy_z1, t_prior, z2_onehot)
+                # Predict noise in latent space
+                noise_pred_prior = self.prior(noisy_z1, t_prior, z2_onehot)
 
-            # Compute prior loss
-            prior_loss = nn.functional.mse_loss(noise_pred_prior, noise_z1)
+                # Compute prior loss
+                prior_loss = nn.functional.mse_loss(noise_pred_prior, noise_z1)
 
             # Update prior
             self.prior_optimizer.zero_grad()
@@ -246,7 +254,7 @@ class TrainerModelB:
             "total_loss": avg_prior_loss + avg_decoder_loss,
         }
 
-    def save_checkpoint(self, path: str, epoch: int):
+    def save_checkpoint(self, path: str, epoch: int, prior_type: str = "diffusion"):
         """Save model checkpoint."""
         os.makedirs(os.path.dirname(path), exist_ok=True)
         torch.save(
@@ -257,6 +265,7 @@ class TrainerModelB:
                 "prior_optimizer_state_dict": self.prior_optimizer.state_dict(),
                 "decoder_optimizer_state_dict": self.decoder_optimizer.state_dict(),
                 "step": self.step,
+                "prior_type": prior_type,
             },
             path,
         )

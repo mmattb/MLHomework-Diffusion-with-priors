@@ -160,12 +160,34 @@ def train_model_b(args):
 
     # Create models
     print("Creating models...")
-    prior = LatentPrior(
-        latent_dim=args.latent_dim,
-        condition_dim=2,  # z2 one-hot
-        time_embed_dim=32,
-        hidden_dims=(256, 256, 256),
-    )
+
+    # Create prior based on type
+    if args.prior_type == "categorical":
+        from models import CategoricalPrior
+
+        prior = CategoricalPrior(
+            z1_embeddings=dataset.z1_embeddings,
+            z1_subtypes=dataset.z1_subtypes,
+            condition_dim=2,
+        )
+        prior_diffusion = None  # Not used for categorical prior
+        print(f"Using CategoricalPrior (discrete z1 sampling)")
+    else:  # diffusion
+        from models import LatentPrior
+
+        prior = LatentPrior(
+            latent_dim=args.latent_dim,
+            condition_dim=2,  # z2 one-hot
+            time_embed_dim=32,
+            hidden_dims=(256, 256, 256),
+        )
+        prior_diffusion = DiffusionProcess(
+            num_timesteps=args.num_timesteps,
+            beta_schedule=args.beta_schedule,
+            device=device,
+        )
+        print(f"Using LatentPrior (diffusion-based z1 sampling)")
+
     decoder = ImageDenoiser(
         image_channels=1,
         condition_dim=args.latent_dim,  # z1 embedding
@@ -180,12 +202,7 @@ def train_model_b(args):
     print(f"Total parameters: {num_params_prior + num_params_decoder:,}")
     print()
 
-    # Create diffusion processes
-    prior_diffusion = DiffusionProcess(
-        num_timesteps=args.num_timesteps,
-        beta_schedule=args.beta_schedule,
-        device=device,
-    )
+    # Create diffusion process for decoder
     decoder_diffusion = DiffusionProcess(
         num_timesteps=args.num_timesteps,
         beta_schedule=args.beta_schedule,
@@ -193,8 +210,15 @@ def train_model_b(args):
     )
 
     # Create optimizers
+    # Use a higher learning rate for the categorical prior since it's a very small model
+    prior_lr = (
+        args.learning_rate * 10
+        if args.prior_type == "categorical"
+        else args.learning_rate
+    )
+
     prior_optimizer = optim.AdamW(
-        prior.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay
+        prior.parameters(), lr=prior_lr, weight_decay=args.weight_decay
     )
     decoder_optimizer = optim.AdamW(
         decoder.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay
@@ -240,10 +264,15 @@ def train_model_b(args):
                 z2_onehot = torch.zeros(16, 2, device=device)
                 z2_onehot[:, 0] = 1.0  # animal
                 # Sample z1 from prior
-                z1_samples = prior_diffusion.p_sample(
-                    prior, shape=(16, args.latent_dim), condition=z2_onehot
-                )
-                z1_samples = z1_samples / torch.norm(z1_samples, dim=1, keepdim=True)
+                if args.prior_type == "categorical":
+                    z1_samples = prior(z2_onehot)
+                else:
+                    z1_samples = prior_diffusion.p_sample(
+                        prior, shape=(16, args.latent_dim), condition=z2_onehot
+                    )
+                    z1_samples = z1_samples / torch.norm(
+                        z1_samples, dim=1, keepdim=True
+                    )
                 # Sample images from decoder
                 samples = decoder_diffusion.p_sample(
                     decoder, shape=(16, 1, 64, 64), condition=z1_samples
@@ -260,10 +289,15 @@ def train_model_b(args):
                 # Generate samples for "vehicle" category
                 z2_onehot = torch.zeros(16, 2, device=device)
                 z2_onehot[:, 1] = 1.0  # vehicle
-                z1_samples = prior_diffusion.p_sample(
-                    prior, shape=(16, args.latent_dim), condition=z2_onehot
-                )
-                z1_samples = z1_samples / torch.norm(z1_samples, dim=1, keepdim=True)
+                if args.prior_type == "categorical":
+                    z1_samples = prior(z2_onehot)
+                else:
+                    z1_samples = prior_diffusion.p_sample(
+                        prior, shape=(16, args.latent_dim), condition=z2_onehot
+                    )
+                    z1_samples = z1_samples / torch.norm(
+                        z1_samples, dim=1, keepdim=True
+                    )
                 samples = decoder_diffusion.p_sample(
                     decoder, shape=(16, 1, 64, 64), condition=z1_samples
                 )
@@ -279,7 +313,7 @@ def train_model_b(args):
 
     # Save final model
     final_path = Path(args.output_dir) / "model_b_final.pt"
-    trainer.save_checkpoint(str(final_path), args.epochs)
+    trainer.save_checkpoint(str(final_path), args.epochs, args.prior_type)
 
     # Plot training curves
     plot_training_curves(
@@ -300,6 +334,13 @@ def main():
         required=True,
         choices=["flat", "hierarchical"],
         help="Model type: flat (Model A) or hierarchical (Model B)",
+    )
+    parser.add_argument(
+        "--prior_type",
+        type=str,
+        default="categorical",
+        choices=["diffusion", "categorical"],
+        help="Type of prior for Model B: 'diffusion' or 'categorical' (default: categorical)",
     )
 
     # Training parameters
